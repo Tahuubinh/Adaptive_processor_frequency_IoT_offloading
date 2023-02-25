@@ -2,48 +2,7 @@ from copy import deepcopy
 import gym
 from gym import spaces
 import numpy as np
-import heapq
-
-
-# event queues record the event happening order
-class event_queue():
-    def __init__(self):
-        self._queue = []
-        self._index = 0
-
-    def push(self, event):
-        #print(event)
-        heapq.heappush(self._queue, (event.arrival_time, self._index, event))
-        self._index += 1
-
-    def pop(self):
-        # return event
-        return heapq.heappop(self._queue)[-1]
-    
-    # def print_queue(self):
-    #     print(self._queue)
-    #     for event in self._queue:
-    #         print(event)
-
-
-# class of system events
-class event:
-    # 0:request arrival 1:energy arrival 2-14 task finish
-    def __init__(self, type, arrival_time, extra_msg=0):
-        self.name = type
-        self.arrival_time = arrival_time
-        self.extra_msg = extra_msg
-        self.core_number = 12
-
-    def __repr__(self):
-        name = 'problem!!'
-        if self.name == 0:
-            name = "request arrival"
-        if self.name == 1:
-            name = "energy consumption pattern change"
-        if 2 <= self.name < self.core_number + 2:
-            name = "task finish of CPU core {}".format(self.name - 2)
-        return "event: '{}', arrival time: {}".format(name, self.arrival_time)
+from environment.event import Event, EventQueue
 
 
 # Training/testing environment for adaptive frequency adjustment in computation offloading scenario
@@ -75,7 +34,7 @@ class CompOffloadingEnv(gym.Env):
             # Add the inter-arrival time to the running sum
             _arrival_time = _arrival_time + _inter_arrival_time
             datasize = np.random.uniform(self.avg_data_size - 10 * 8 * 1e6, self.avg_data_size + 10 * 8 * 1e6)
-            self.event_queue.push(event(0, _arrival_time, datasize))
+            self.event_queue.push(Event(0, _arrival_time, datasize))
 
     def gen_task_finish(self, target_core, data_size, action):
         assert action >= 1
@@ -85,7 +44,7 @@ class CompOffloadingEnv(gym.Env):
         # scope of target core [1, core_number], scope of task_finish event name [2, core_number+1]
         task_finish_time = self.counter + process_time
         # print(target_core, task_finish_time, action)
-        self.event_queue.push(event(target_core + 2, task_finish_time, action))
+        self.event_queue.push(Event(target_core + 2, task_finish_time, action))
         
 
     # generate the event when energy consumption change
@@ -93,7 +52,7 @@ class CompOffloadingEnv(gym.Env):
         for i in range(self.simulation_start, self.simulation_end):
             # energy produce in 1 hour
             energy_produce_rate = 3600 * self.panel_size * GHI_data[i] / 1
-            self.event_queue.push(event(1, i, energy_produce_rate))
+            self.event_queue.push(Event(1, i, energy_produce_rate))
 
     def update_post_action_status(self):
 
@@ -218,7 +177,7 @@ class CompOffloadingEnv(gym.Env):
         self.day = 0
         ###########################
         # initialize request and energy event
-        self.event_queue = event_queue()
+        self.event_queue = EventQueue()
         self.gen_request()
         self.gen_energy_produce_change(GHI_Data)
         # find the first request arrival event

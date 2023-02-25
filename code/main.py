@@ -6,7 +6,7 @@ from schedule.NAFA import NAFA_Agent
 from schedule.best_fit import best_fit
 from schedule.linUCB import LinUCBAgent
 from schedule.worst_fit import worst_fit
-from comp_offload import CompOffloadingEnv
+from environment.comp_offload import CompOffloadingEnv
 
 
 if __name__ == "__main__":
