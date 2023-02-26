@@ -27,6 +27,7 @@ class CompOffloadingEnv(gym.Env):
         self.core_number = 12
         self.frequency_set = np.array([2e9, 3e9, 4e9])
         self.lambda_request = args.lambda_r
+        # 24-hour-scale local time, battery status, energy reservation status, [running CPU cores in the frequency], data_size
         low = np.concatenate([[0], [0], [0], np.zeros(len(self.frequency_set)), [self.avg_data_size - 10 * 8 * 1e6]])
         high = np.concatenate(
             [[24], [self.battery_size], [self.battery_size], self.core_number * np.zeros(len(self.frequency_set)),
@@ -105,8 +106,11 @@ class CompOffloadingEnv(gym.Env):
                 self.running_instance[action - 1] -= 1
             self.counter = next_event.arrival_time
             self.event = next_event
+            # print(next_event)
             if self.event.name == 0:
+                # assert next_event.extra_msg > 25
                 break
+            
         assert self.event.name == 0
         return
 
@@ -135,7 +139,7 @@ class CompOffloadingEnv(gym.Env):
                 # no core is free,then it must be rejected by overloaded
                 if np.sum(self.running_instance) == self.core_number:
                     self.n_reject_high_latency[self.day - 1] += 1
-                # there are other possble actions, it must be rejected due to conservation
+                # there are other possible actions, it must be rejected due to conservation
                 else:
                     assert len(possible_actions) != 0
                     self.n_reject_conservation[self.day - 1] += 1

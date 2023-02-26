@@ -2,7 +2,8 @@ import numpy as np
 import torch
 from util.data_util import read_energy_data, save_data
 from util.options import args_parser
-from schedule.NAFA import NAFA_Agent
+#from schedule.value_based_rl.NAFA import NAFA_Agent
+from schedule.value_based_rl.DoubleDQNPer import NAFA_Agent
 from schedule.best_fit import best_fit
 from schedule.linUCB import LinUCBAgent
 from schedule.worst_fit import worst_fit
@@ -13,13 +14,13 @@ if __name__ == "__main__":
     args = args_parser()
     args.device = torch.device("cpu")
     print(args)
-    env = CompOffloadingEnv(args, task_data = '../data/task_data/data_30_160000000_360_80000000_20000_ver_1.csv')
+    env = CompOffloadingEnv(args, task_data = '../data/task_data/data_30_160000000_366_80000000_20000_ver_1/train.csv')
     N_S = env.observation_space.shape[0]
     N_A = env.action_space.n
     immediate_reward = 0
     print(args.method)
     if args.method == "NAFA":
-        agent = NAFA_Agent(args, env, num_series = 3, max_episode = 2, ep_long = 24)
+        agent = NAFA_Agent(args, env, num_series = 2, max_episode = 2, ep_long = 24)
         # agent.loadWeights("data/model_{}_{}.pkl".format(args.lambda_r,args.tradeoff))
         agent.train()
         # print("data/model_{}_{}_{}.pkl".format(args.lambda_r,args.tradeoff,str(args.trial)))

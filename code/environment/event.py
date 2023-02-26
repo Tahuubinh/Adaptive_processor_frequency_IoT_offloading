@@ -11,10 +11,13 @@ class Event:
 
     def __repr__(self):
         name = 'problem!!'
+        # extra_msg is data_size
         if self.name == 0:
             name = "request arrival"
+        # extra_msg is acquired energy
         if self.name == 1:
             name = "energy consumption pattern change"
+        # extra_msg is action
         if 2 <= self.name < self.core_number + 2:
             name = "task finish of CPU core {}".format(self.name - 2)
         return "event: '{}', arrival time: {}".format(name, self.arrival_time)
