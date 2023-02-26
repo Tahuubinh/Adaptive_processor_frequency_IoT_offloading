@@ -2,16 +2,27 @@ from copy import deepcopy
 import gym
 from gym import spaces
 import numpy as np
+import pandas as pd
 from environment.event import Event, EventQueue
+import json
 
 
 # Training/testing environment for adaptive frequency adjustment in computation offloading scenario
 class CompOffloadingEnv(gym.Env):
 
-    def __init__(self, args):
+    def __init__(self, args, task_data):
+        with open(task_data, 'r') as f:
+            readlines = f.readlines()
+            # get generation info
+            self.gentask_info = list(readlines)[0].replace(";", "," )
+            self.gentask_info = json.loads('{' + self.gentask_info[:-1] + '}')
+            # get task info
+            # self.datatask = list(readlines)[2:]
+            
+        self.datatask = pd.read_csv(task_data, skiprows=[0])
         self.kappa = 1e-28
-        self.complexity = 20000
-        self.avg_data_size = 20 * 8 * 1e6  # 20MB
+        self.complexity = self.gentask_info['complexity']
+        self.avg_data_size = self.gentask_info['avg_data_size']  # 20MB
         self.battery_size = 1e6
         self.core_number = 12
         self.frequency_set = np.array([2e9, 3e9, 4e9])
@@ -25,18 +36,29 @@ class CompOffloadingEnv(gym.Env):
         self.panel_size = args.panel_size
         self.args = args
 
-    def gen_request(self):
-        _lambda = self.lambda_request
-        _arrival_time = self.simulation_start
-        while _arrival_time < self.simulation_end:
-            # Plug it into the inverse of the CDF of Exponential(_lamnbda)
-            _inter_arrival_time = np.random.exponential(1 / _lambda, size=1)[0]
-            # Add the inter-arrival time to the running sum
-            _arrival_time = _arrival_time + _inter_arrival_time
-            datasize = np.random.uniform(self.avg_data_size - 10 * 8 * 1e6, self.avg_data_size + 10 * 8 * 1e6)
-            self.event_queue.push(Event(0, _arrival_time, datasize))
+    def getRequest(self):
+        event_tasks = self.datatask[self.datatask['arrival_time'] >= self.simulation_start]
+        event_tasks = event_tasks[event_tasks['arrival_time'] < self.simulation_end]
+        #self.remain_task = event_tasks.shape[0]
+        #print(self.datatask[self.datatask['arrival_time'] >= self.simulation_end].head(1))
+        event_tasks = pd.concat([event_tasks, 
+                                 self.datatask[self.datatask['arrival_time'] >= self.simulation_end].head(1)])
+        for index, row in event_tasks.iterrows():
+            self.event_queue.push(Event(row['type'], row['arrival_time'], row['data_size']))
+        
+    # def getRequest(self):
+    #     _lambda = self.lambda_request
+    #     _arrival_time = self.simulation_start
+    #     while _arrival_time < self.simulation_end:
+    #         # Plug it into the inverse of the CDF of Exponential(_lamnbda)
+    #         _inter_arrival_time = np.random.exponential(1 / _lambda, size=1)[0]
+    #         # Add the inter-arrival time to the running sum
+    #         _arrival_time = _arrival_time + _inter_arrival_time
+    #         datasize = np.random.uniform(self.avg_data_size - 10 * 8 * 1e6, self.avg_data_size + 10 * 8 * 1e6)
+    #         self.event_queue.push(Event(0, _arrival_time, datasize))
+    #         print(Event(0, _arrival_time, datasize))
 
-    def gen_task_finish(self, target_core, data_size, action):
+    def calculateTaskFinish(self, target_core, data_size, action):
         assert action >= 1
         # floor the frequency in case of exceeding reservation energy
         frequency = self.frequency_set[action - 1]
@@ -48,13 +70,13 @@ class CompOffloadingEnv(gym.Env):
         
 
     # generate the event when energy consumption change
-    def gen_energy_produce_change(self, GHI_data):
+    def calculateEnergyProduceChange(self, GHI_data):
         for i in range(self.simulation_start, self.simulation_end):
             # energy produce in 1 hour
             energy_produce_rate = 3600 * self.panel_size * GHI_data[i] / 1
             self.event_queue.push(Event(1, i, energy_produce_rate))
 
-    def update_post_action_status(self):
+    def updatePostActionStatus(self):
 
         # do not break the iteration until a request comes!
         while True:
@@ -92,9 +114,9 @@ class CompOffloadingEnv(gym.Env):
     def step(self, action):
         # other inner events cannot be exposed to outside
         assert self.event.name == 0
-        possible_actions = self.possible_action_given_state(self.current_status_to_state())
+        possible_actions = self.getPossibleActionGivenState(self.convertCurrentStatusToState())
         assert action in possible_actions, "action: '{}' is invalid in state '{}'".format(action,
-                                                                                          self.current_status_to_state())
+                                                                                          self.convertCurrentStatusToState())
         # update the statistic record data
         if (self.counter - self.simulation_start) > 24 * self.day:
             self.day += 1
@@ -134,17 +156,21 @@ class CompOffloadingEnv(gym.Env):
                     target_core = i
                     break
             self.core_frequency[target_core] = frequency
-            self.gen_task_finish(target_core, data_size, action)
+            self.calculateTaskFinish(target_core, data_size, action)
 
         self.day_rewards[self.day - 1] += reward
-        self.update_post_action_status()
+        self.updatePostActionStatus()
+        #self.remain_task -= 1
+        # print(self.remain_task)
+        # if self.remain_task == 1:
+        
         if self.counter > self.simulation_end:
             is_terminal = True
         else:
             is_terminal = False
 
         assert self.event.name == 0
-        return self.current_status_to_state(), reward, is_terminal
+        return self.convertCurrentStatusToState(), reward, is_terminal
 
     # reset the current environment status
     def reset(self, is_train, simulation_start, simulation_end, GHI_Data):
@@ -178,14 +204,14 @@ class CompOffloadingEnv(gym.Env):
         ###########################
         # initialize request and energy event
         self.event_queue = EventQueue()
-        self.gen_request()
-        self.gen_energy_produce_change(GHI_Data)
+        self.getRequest()
+        self.calculateEnergyProduceChange(GHI_Data)
         # find the first request arrival event
-        self.update_post_action_status()
-        return self.current_status_to_state()
+        self.updatePostActionStatus()
+        return self.convertCurrentStatusToState()
 
     # transfer current environment status to state
-    def current_status_to_state(self):
+    def convertCurrentStatusToState(self):
         # only usable for event 0. state is meaningful only when event=0
         event = self.event
         assert self.event.name == 0
@@ -209,7 +235,7 @@ class CompOffloadingEnv(gym.Env):
                 actions.add(frequency_index + 1)
         return actions
 
-    def possible_action_given_state(self, state):
+    def getPossibleActionGivenState(self, state):
         invalid = self.filterInvalidAction(state)
         possible_action = set()
         possible_action.add(0)

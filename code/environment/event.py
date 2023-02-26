@@ -19,6 +19,9 @@ class Event:
             name = "task finish of CPU core {}".format(self.name - 2)
         return "event: '{}', arrival time: {}".format(name, self.arrival_time)
     
+    def getType(self):
+        return self.name
+    
 
 
 # event queues record the event happening order
@@ -35,6 +38,14 @@ class EventQueue():
     def pop(self):
         # return event
         return heapq.heappop(self._queue)[-1]
+    
+    def isEmpty(self):
+        # return event
+        return len(self._queue) == 0
+    
+    def getLen(self):
+        # return event
+        return len(self._queue)
     
     # def print_queue(self):
     #     print(self._queue)

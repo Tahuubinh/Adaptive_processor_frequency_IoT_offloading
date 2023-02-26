@@ -13,17 +13,17 @@ if __name__ == "__main__":
     args = args_parser()
     args.device = torch.device("cpu")
     print(args)
-    env = CompOffloadingEnv(args)
+    env = CompOffloadingEnv(args, task_data = '../data/task_data/data_30_160000000_360_80000000_20000_ver_1.csv')
     N_S = env.observation_space.shape[0]
     N_A = env.action_space.n
     immediate_reward = 0
     print(args.method)
     if args.method == "NAFA":
-        agent = NAFA_Agent(args, env, num_series = 1, max_episode = 1, ep_long = 24)
-        # agent.load_weights("data/model_{}_{}.pkl".format(args.lambda_r,args.tradeoff))
+        agent = NAFA_Agent(args, env, num_series = 3, max_episode = 2, ep_long = 24)
+        # agent.loadWeights("data/model_{}_{}.pkl".format(args.lambda_r,args.tradeoff))
         agent.train()
         # print("data/model_{}_{}_{}.pkl".format(args.lambda_r,args.tradeoff,str(args.trial)))
-        agent.load_weights("../result/model_{}_{}_{}.pkl".format(args.lambda_r, args.tradeoff, str(args.trial)))
+        agent.loadWeights("../result/model_{}_{}_{}.pkl".format(args.lambda_r, args.tradeoff, str(args.trial)))
     if args.method == "BF":  # best-fit
         agent = best_fit(env)
     if args.method == "WF":  # worst-fit

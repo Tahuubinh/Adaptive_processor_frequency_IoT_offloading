@@ -19,27 +19,6 @@ def read_energy_data(is_train):
     return GHI
 
 def save_data(env, args):
-    # output = open(
-    #     'result/n_reject_low_power_{}_{}_{}.pkl'.format(str(args.method), str(args.lambda_r), str(args.tradeoff)), 'wb')
-    # pickle.dump(env.n_reject_low_power, output)
-    # output = open(
-    #     'result/n_reject_conservation_{}_{}_{}.pkl'.format(str(args.method), str(args.lambda_r), str(args.tradeoff)),
-    #     'wb')
-    # pickle.dump(env.n_reject_conservation, output)
-    # output = open(
-    #     'result/n_reject_high_latency_{}_{}_{}.pkl'.format(str(args.method), str(args.lambda_r), str(args.tradeoff)),
-    #     'wb')
-    # pickle.dump(env.n_reject_high_latency, output)
-    # output = open('result/total_latency_{}_{}_{}.pkl'.format(str(args.method), str(args.lambda_r), str(args.tradeoff)),
-    #               'wb')
-    # pickle.dump(env.total_latency, output)
-    # output = open('result/n_total_request_{}_{}_{}.pkl'.format(str(args.method), str(args.lambda_r), str(args.tradeoff)),
-    #               'wb')
-    # pickle.dump(env.n_total_request, output)
-    # output = open('result/day_rewards_{}_{}_{}.pkl'.format(str(args.method), str(args.lambda_r), str(args.tradeoff)),
-    #               'wb')
-    # pickle.dump(env.day_rewards, output)
-    
     env_result = dict()
     env_result['n_reject_low_power'] = env.n_reject_low_power[0]
     env_result['n_reject_conservation'] = env.n_reject_conservation[0]

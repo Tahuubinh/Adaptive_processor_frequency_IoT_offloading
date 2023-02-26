@@ -86,7 +86,7 @@ class NAFA_Agent:
             q_value = self.model.forward(state_input)
             action = self.find_max_action(np.array([state]), q_value)[0]
         else:
-            actions = self.env.possible_action_given_state(state)
+            actions = self.env.getPossibleActionGivenState(state)
             action = np.random.choice(list(actions))
         return action
 
@@ -129,6 +129,7 @@ class NAFA_Agent:
         for series in range(self.num_series):
             done = True
             ep_num = 0
+            print(f'SERIES {series}')
             while ep_num < self.max_episode:
                 if done:
                     state = self.env.reset(is_train=True, simulation_start=ep_num * self.ep_long,
@@ -151,16 +152,16 @@ class NAFA_Agent:
                 # print(self.config.print_interval)
                 # print(done)
                 # break
-                if fr % self.config.print_interval == 0:
-                    print("Day: %d\nrewards: %f, losses: %f, episode: %d" % (
-                        self.env.counter / 24, episode_reward / ((self.env.counter - self.env.simulation_start) / 24),
-                        np.sum(losses[-100:]) / 100, ep_num))
-                    print("epsilon = {}".format(epsilon))
+                # if fr % self.config.print_interval == 0:
+                #     print("PERIOD: %d\nrewards: %f, losses: %f, episode: %d" % (
+                #         self.env.counter / 24, episode_reward / ((self.env.counter - self.env.simulation_start) / 24),
+                #         np.sum(losses[-100:]) / 100, ep_num))
+                #     print("epsilon = {}".format(epsilon))
                 state = next_state
                 if done:
-                    print('episode: {} rewards: {}  epsilon: {} losses: {}'.format(ep_num, episode_reward, epsilon,
+                    print('Episode: {}\nrewards: {}  epsilon: {} losses: {}'.format(ep_num, episode_reward, epsilon,
                                                                               np.sum(losses[-100:]) / 100))
-                    self.save_model("../result", str(self.config.lambda_r) + "_" + str(self.config.tradeoff) + "_" + str(
+                    self.saveModel("../result", str(self.config.lambda_r) + "_" + str(self.config.tradeoff) + "_" + str(
                         self.config.trial))
                     episode_reward = 0
                     ep_num += 1
@@ -177,6 +178,7 @@ class NAFA_Agent:
 
     # uniform the state to the scale of [0,1]
     def uniform_state(self, s):
+        # len of s can be 1 or batch_size
         input_s = deepcopy(s)
         input_s[:, 0] = (input_s[:, 0] - 0) / (24 - 0)
         input_s[:, 1] = (input_s[:, 1] - 0) / (self.env.battery_size - 0)
@@ -189,7 +191,7 @@ class NAFA_Agent:
         return input_s
 
     # load weight for the Q network
-    def load_weights(self, model_path):
+    def loadWeights(self, model_path):
         if model_path is None: return
         self.model.load_state_dict(torch.load(model_path))
 
@@ -201,5 +203,5 @@ class NAFA_Agent:
     #     output = open('data/tr_loss_{}_{}.pkl'.format(str(self.config.lambda_r), str(self.config.tradeoff)), 'wb')
     #     pickle.dump(loss,output)
 
-    def save_model(self, output, tag=''):
+    def saveModel(self, output, tag=''):
         torch.save(self.model.state_dict(), '%s/model_%s.pkl' % (output, tag))

@@ -15,7 +15,7 @@ def args_parser():
     # NAFA parameters
     parser.add_argument('--learning_rate', default=5e-4, help='NAFA learning rate')
     parser.add_argument('--update_tar_interval', default=5000, help='target network update periodicity')
-    parser.add_argument('--batch_size', default=80, help='mini-batch size')
+    parser.add_argument('--batch_size', default=64, help='mini-batch size')
     parser.add_argument('--max_buff', default=1e6, help='replay memory size')
     parser.add_argument('--epsilon', default=0.5, help='initial epsilon')
     parser.add_argument('--epsilon_min', default=0.01, help='final epsilon')
