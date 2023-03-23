@@ -1,0 +1,2 @@
+episode,total_request,average_latency,average_reject_conservation,average_reject_low_power,average_reject_overload,average_rewards
+0,719.0,0.19454779621122845,0.08762169680111266,0.17107093184979139,0.015299026425591099,0.1423649562898193

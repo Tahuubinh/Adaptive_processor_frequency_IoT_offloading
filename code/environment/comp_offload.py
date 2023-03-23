@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 from environment.event import Event, EventQueue
 import json
+import csv
 
 
 # Training/testing environment for adaptive frequency adjustment in computation offloading scenario
@@ -37,6 +38,15 @@ class CompOffloadingEnv(gym.Env):
         self.observation_space = spaces.Box(low, high, dtype=np.float32)
         self.panel_size = args.panel_size
         self.args = args
+        self.episodeID = 0
+        with open(f"{self.args.link_project}/result/{self.args.save_folder}/overall.csv", 'w', newline='') as file:
+            csvwriter = csv.writer(file)
+            csvwriter.writerow(['episode', 'total_request', 'average_latency', 'average_reject_conservation', 'average_reject_low_power',
+                                'average_reject_overload', 'average_rewards'])
+
+        with open(f"{self.args.link_project}/result/{self.args.save_folder}/action_choices.csv", 'w', newline='') as file:
+            csvwriter = csv.writer(file)
+            csvwriter.writerow([*range(self.action_space.n)])
 
     def getRequest(self):
         event_tasks = self.datatask[self.datatask['arrival_time']
@@ -50,18 +60,6 @@ class CompOffloadingEnv(gym.Env):
         for index, row in event_tasks.iterrows():
             self.event_queue.push(
                 Event(row['type'], row['arrival_time'], row['data_size']))
-
-    # def getRequest(self):
-    #     _lambda = self.lambda_request
-    #     _arrival_time = self.simulation_start
-    #     while _arrival_time < self.simulation_end:
-    #         # Plug it into the inverse of the CDF of Exponential(_lamnbda)
-    #         _inter_arrival_time = np.random.exponential(1 / _lambda, size=1)[0]
-    #         # Add the inter-arrival time to the running sum
-    #         _arrival_time = _arrival_time + _inter_arrival_time
-    #         datasize = np.random.uniform(self.avg_data_size - 10 * 8 * 1e6, self.avg_data_size + 10 * 8 * 1e6)
-    #         self.event_queue.push(Event(0, _arrival_time, datasize))
-    #         print(Event(0, _arrival_time, datasize))
 
     def calculateTaskFinish(self, target_core, data_size, action):
         assert action >= 1
@@ -124,6 +122,7 @@ class CompOffloadingEnv(gym.Env):
     def step(self, action):
         # other inner events cannot be exposed to outside
         assert self.event.name == 0
+        self.action_choices[action] += 1
         possible_actions = self.getPossibleActionGivenState(
             self.convertCurrentStatusToState())
         assert action in possible_actions, "action: '{}' is invalid in state '{}'".format(action,
@@ -131,7 +130,7 @@ class CompOffloadingEnv(gym.Env):
         # update the statistic record data
         if (self.counter - self.simulation_start) > 24 * self.day:
             self.day += 1
-        self.n_total_request[self.day - 1] += 1
+        self.n_total_request[self.day] += 1
 
         data_size = self.event.extra_msg
 
@@ -142,15 +141,15 @@ class CompOffloadingEnv(gym.Env):
             least_reserved_energy = self.kappa * least_frequency ** 3 * \
                 (data_size * self.complexity / least_frequency)
             if self.reservation_status + least_reserved_energy > self.battery_status:
-                self.n_reject_low_power[self.day - 1] += 1
+                self.n_reject_low_power[self.day] += 1
             else:
                 # no core is free,then it must be rejected by overloaded
                 if np.sum(self.running_instance) == self.core_number:
-                    self.n_reject_high_latency[self.day - 1] += 1
+                    self.n_reject_overload[self.day] += 1
                 # there are other possible actions, it must be rejected due to conservation
                 else:
                     assert len(possible_actions) != 0
-                    self.n_reject_conservation[self.day - 1] += 1
+                    self.n_reject_conservation[self.day] += 1
         else:
 
             frequency = self.frequency_set[action - 1]
@@ -159,7 +158,7 @@ class CompOffloadingEnv(gym.Env):
             reward = 1 - (self.args.tradeoff * process_time)
 
             # print(queue_status[target-1])
-            self.total_latency[self.day - 1] += process_time
+            self.total_latency[self.day] += process_time
             self.reservation_status += self.kappa * frequency ** 3 * \
                 data_size * self.complexity / frequency
             self.running_instance[action - 1] += 1
@@ -171,7 +170,7 @@ class CompOffloadingEnv(gym.Env):
             self.core_frequency[target_core] = frequency
             self.calculateTaskFinish(target_core, data_size, action)
 
-        self.day_rewards[self.day - 1] += reward
+        self.day_rewards[self.day] += reward
         self.updatePostActionStatus()
         #self.remain_task -= 1
         # print(self.remain_task)
@@ -206,14 +205,16 @@ class CompOffloadingEnv(gym.Env):
 
         ###########################
         # statistic data for recording purpose
-        day_num = int((simulation_end - simulation_start) / 24)
+        day_num = int((simulation_end - simulation_start) / 24) + 1
         self.total_latency = np.zeros([day_num])
         self.n_reject_conservation = np.zeros([day_num])
         self.n_total_request = np.zeros([day_num])
+        # self.n_total_request[0] = 1
         self.n_reject_low_power = np.zeros([day_num])
-        self.n_reject_high_latency = np.zeros([day_num])
+        self.n_reject_overload = np.zeros([day_num])
         self.day_rewards = np.zeros([day_num])
         self.day = 0
+        self.action_choices = np.zeros(self.action_space.n)
         ###########################
         # initialize request and energy event
         self.event_queue = EventQueue()
@@ -223,7 +224,27 @@ class CompOffloadingEnv(gym.Env):
         self.updatePostActionStatus()
         return self.convertCurrentStatusToState()
 
+    def saveResults(self):
+        n_total_request = np.sum(self.n_total_request)
+        average_latency = np.sum(self.total_latency) / n_total_request
+        average_reject_conservation = np.sum(
+            self.n_reject_conservation) / n_total_request
+        average_reject_low_power = np.sum(
+            self.n_reject_low_power) / n_total_request
+        average_reject_overload = np.sum(
+            self.n_reject_overload) / n_total_request
+        average_rewards = np.sum(self.day_rewards) / n_total_request
+        with open(f"{self.args.link_project}/result/{self.args.save_folder}/overall.csv", 'a', newline='') as file:
+            csvwriter = csv.writer(file)
+            csvwriter.writerow([self.episodeID, n_total_request, average_latency, average_reject_conservation, average_reject_low_power,
+                                average_reject_overload, average_rewards])
+        with open(f"{self.args.link_project}/result/{self.args.save_folder}/action_choices.csv", 'a', newline='') as file:
+            csvwriter = csv.writer(file)
+            csvwriter.writerow(self.action_choices)
+        self.episodeID += 1
+
     # transfer current environment status to state
+
     def convertCurrentStatusToState(self):
         # only usable for event 0. state is meaningful only when event=0
         event = self.event

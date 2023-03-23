@@ -10,9 +10,12 @@ LINK_PROJECT = Path(os.path.abspath(__file__)).parent.parent.parent
 
 def args_parser():
     parser = argparse.ArgumentParser()
-    # constant values
+    # link project
     parser.add_argument(
         '--link_project', default=f'{LINK_PROJECT}', help='link project')
+
+    parser.add_argument(
+        '--save_folder', default=f'test', help='folder to save results')
     # simulation parameters
     parser.add_argument('--method', default='NAFA', help='scheduling method')
     parser.add_argument('--lambda_r', type=int, default=30,

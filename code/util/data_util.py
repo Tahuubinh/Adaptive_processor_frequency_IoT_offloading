@@ -23,13 +23,37 @@ def read_energy_data(is_train):
     return GHI
 
 
+# def save_data(env, args):
+#     env_result = dict()
+#     env_result['n_reject_low_power'] = env.n_reject_low_power[0]
+#     env_result['n_reject_conservation'] = env.n_reject_conservation[0]
+#     env_result['average_reject_overload'] = env.average_reject_overload[0]
+#     env_result['total_latency'] = env.total_latency[0]
+#     env_result['n_total_request'] = env.n_total_request[0]
+#     env_result['day_rewards'] = env.day_rewards[0]
+#     with open(f'{args.link_project}/result/env_result.json', "w") as outfile:
+#         json.dump(env_result, outfile)
+
 def save_data(env, args):
-    env_result = dict()
-    env_result['n_reject_low_power'] = env.n_reject_low_power[0]
-    env_result['n_reject_conservation'] = env.n_reject_conservation[0]
-    env_result['n_reject_high_latency'] = env.n_reject_high_latency[0]
-    env_result['total_latency'] = env.total_latency[0]
-    env_result['n_total_request'] = env.n_total_request[0]
-    env_result['day_rewards'] = env.day_rewards[0]
-    with open(f'{args.link_project}/result/env_result.json', "w") as outfile:
-        json.dump(env_result, outfile)
+    output = open(
+        'data/n_reject_low_power_{}_{}_{}.pkl'.format(str(args.method), str(args.lambda_r), str(args.tradeoff)), 'wb')
+    pickle.dump(env.n_reject_low_power, output)
+    output = open(
+        'data/n_reject_conservation_{}_{}_{}.pkl'.format(
+            str(args.method), str(args.lambda_r), str(args.tradeoff)),
+        'wb')
+    pickle.dump(env.n_reject_conservation, output)
+    output = open(
+        'data/n_reject_overload_{}_{}_{}.pkl'.format(
+            str(args.method), str(args.lambda_r), str(args.tradeoff)),
+        'wb')
+    pickle.dump(env.n_reject_overload, output)
+    output = open('data/total_latency_{}_{}_{}.pkl'.format(str(args.method), str(args.lambda_r), str(args.tradeoff)),
+                  'wb')
+    pickle.dump(env.total_latency, output)
+    output = open('data/n_total_request_{}_{}_{}.pkl'.format(str(args.method), str(args.lambda_r), str(args.tradeoff)),
+                  'wb')
+    pickle.dump(env.n_total_request, output)
+    output = open('data/day_rewards_{}_{}_{}.pkl'.format(str(args.method), str(args.lambda_r), str(args.tradeoff)),
+                  'wb')
+    pickle.dump(env.day_rewards, output)

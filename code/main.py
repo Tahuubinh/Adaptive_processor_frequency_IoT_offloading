@@ -10,13 +10,19 @@ from util.model_util import trainModel
 if __name__ == "__main__":
     args = args_parser()
     args.device = torch.device("cpu")
-    print(args)
+    args.method = 'NAFA'
+    args.save_folder = args.method
+
+    path = f'{args.link_project}/result/{args.save_folder}'
+    if not os.path.exists(path):
+        os.makedirs(path)
+    print(f"The new directory is created: {path}")
+
     env = CompOffloadingEnv(
         args, task_data=f'{args.link_project}/data/task_data/data_30_160000000_366_80000000_20000_ver_1/train.csv')
     N_S = env.observation_space.shape[0]
     N_A = env.action_space.n
     immediate_reward = 0
-    args.method = 'NAFAPER'
     agent = trainModel(args, env)
     episode = 0
     GHI_Data = read_energy_data(is_train=False)

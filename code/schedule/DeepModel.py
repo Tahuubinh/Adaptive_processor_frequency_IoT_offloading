@@ -4,8 +4,8 @@ from copy import deepcopy
 
 
 class DeepModel:
-    def __init__(self, options, env, num_series, max_episode, ep_long, **kwargs):
-        self.config = options
+    def __init__(self, args, env, num_series, max_episode, ep_long, **kwargs):
+        self.args = args
         self.env = env
         self.max_episode = max_episode
         self.ep_long = ep_long
@@ -38,3 +38,23 @@ class DeepModel:
             return False
         else:
             return True
+
+    # uniform the state to the scale of [0,1]
+    def uniform_state(self, s):
+        # len of s can be 1 or batch_size
+        input_s = deepcopy(s)
+        # 24-hour-scale local time
+        input_s[:, 0] = (input_s[:, 0] - 0) / (24 - 0)
+        # battery status
+        input_s[:, 1] = (input_s[:, 1] - 0) / (self.env.battery_size - 0)
+        # energy reservation status
+        input_s[:, 2] = (input_s[:, 2] - 0) / (self.env.battery_size - 0)
+        # running CPU cores in the frequency
+        input_s[:, 3:-1] = (input_s[:, 3:-1] - 0) / (self.env.core_number - 0)
+        # data size
+        input_s[:, -1] = (input_s[:, -1] - (self.env.avg_data_size - 10 * 8 * 1e6)) / (
+            (self.env.avg_data_size + 10 * 8 * 1e6) - (self.env.avg_data_size - 10 * 8 * 1e6))
+        assert self.check_input_state(input_s)
+        input_s = torch.tensor(
+            input_s, dtype=torch.float).to(self.args.device)
+        return input_s
