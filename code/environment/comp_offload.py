@@ -14,11 +14,11 @@ class CompOffloadingEnv(gym.Env):
         with open(task_data, 'r') as f:
             readlines = f.readlines()
             # get generation info
-            self.gentask_info = list(readlines)[0].replace(";", "," )
+            self.gentask_info = list(readlines)[0].replace(";", ",")
             self.gentask_info = json.loads('{' + self.gentask_info[:-1] + '}')
             # get task info
             # self.datatask = list(readlines)[2:]
-            
+
         self.datatask = pd.read_csv(task_data, skiprows=[0])
         self.kappa = 1e-28
         self.complexity = self.gentask_info['complexity']
@@ -28,7 +28,8 @@ class CompOffloadingEnv(gym.Env):
         self.frequency_set = np.array([2e9, 3e9, 4e9])
         self.lambda_request = args.lambda_r
         # 24-hour-scale local time, battery status, energy reservation status, [running CPU cores in the frequency], data_size
-        low = np.concatenate([[0], [0], [0], np.zeros(len(self.frequency_set)), [self.avg_data_size - 10 * 8 * 1e6]])
+        low = np.concatenate([[0], [0], [0], np.zeros(len(self.frequency_set)), [
+                             self.avg_data_size - 10 * 8 * 1e6]])
         high = np.concatenate(
             [[24], [self.battery_size], [self.battery_size], self.core_number * np.zeros(len(self.frequency_set)),
              [self.avg_data_size + 10 * 8 * 1e6]])
@@ -38,15 +39,18 @@ class CompOffloadingEnv(gym.Env):
         self.args = args
 
     def getRequest(self):
-        event_tasks = self.datatask[self.datatask['arrival_time'] >= self.simulation_start]
-        event_tasks = event_tasks[event_tasks['arrival_time'] < self.simulation_end]
+        event_tasks = self.datatask[self.datatask['arrival_time']
+                                    >= self.simulation_start]
+        event_tasks = event_tasks[event_tasks['arrival_time']
+                                  < self.simulation_end]
         #self.remain_task = event_tasks.shape[0]
         #print(self.datatask[self.datatask['arrival_time'] >= self.simulation_end].head(1))
-        event_tasks = pd.concat([event_tasks, 
+        event_tasks = pd.concat([event_tasks,
                                  self.datatask[self.datatask['arrival_time'] >= self.simulation_end].head(1)])
         for index, row in event_tasks.iterrows():
-            self.event_queue.push(Event(row['type'], row['arrival_time'], row['data_size']))
-        
+            self.event_queue.push(
+                Event(row['type'], row['arrival_time'], row['data_size']))
+
     # def getRequest(self):
     #     _lambda = self.lambda_request
     #     _arrival_time = self.simulation_start
@@ -68,9 +72,9 @@ class CompOffloadingEnv(gym.Env):
         task_finish_time = self.counter + process_time
         # print(target_core, task_finish_time, action)
         self.event_queue.push(Event(target_core + 2, task_finish_time, action))
-        
 
     # generate the event when energy consumption change
+
     def calculateEnergyProduceChange(self, GHI_data):
         for i in range(self.simulation_start, self.simulation_end):
             # energy produce in 1 hour
@@ -84,9 +88,11 @@ class CompOffloadingEnv(gym.Env):
             next_event = self.event_queue.pop()
             # update the battery status
             core_power = np.sum(self.kappa * self.core_frequency ** 3 * 3600)
-            self.battery_status = max(self.battery_status - core_power * (next_event.arrival_time - self.counter), 0)
+            self.battery_status = max(
+                self.battery_status - core_power * (next_event.arrival_time - self.counter), 0)
             self.battery_status = min(
-                self.battery_status + self.energy_produce_rate * (next_event.arrival_time - self.counter),
+                self.battery_status + self.energy_produce_rate *
+                (next_event.arrival_time - self.counter),
                 self.battery_size)
             # unlock the reservation energy
             self.reservation_status = max(
@@ -110,7 +116,7 @@ class CompOffloadingEnv(gym.Env):
             if self.event.name == 0:
                 # assert next_event.extra_msg > 25
                 break
-            
+
         assert self.event.name == 0
         return
 
@@ -118,7 +124,8 @@ class CompOffloadingEnv(gym.Env):
     def step(self, action):
         # other inner events cannot be exposed to outside
         assert self.event.name == 0
-        possible_actions = self.getPossibleActionGivenState(self.convertCurrentStatusToState())
+        possible_actions = self.getPossibleActionGivenState(
+            self.convertCurrentStatusToState())
         assert action in possible_actions, "action: '{}' is invalid in state '{}'".format(action,
                                                                                           self.convertCurrentStatusToState())
         # update the statistic record data
@@ -132,7 +139,8 @@ class CompOffloadingEnv(gym.Env):
             reward = 0
             # rejection resulted from energy overbooked
             least_frequency = np.min(self.frequency_set)
-            least_reserved_energy = self.kappa * least_frequency ** 3 * (data_size * self.complexity / least_frequency)
+            least_reserved_energy = self.kappa * least_frequency ** 3 * \
+                (data_size * self.complexity / least_frequency)
             if self.reservation_status + least_reserved_energy > self.battery_status:
                 self.n_reject_low_power[self.day - 1] += 1
             else:
@@ -152,7 +160,8 @@ class CompOffloadingEnv(gym.Env):
 
             # print(queue_status[target-1])
             self.total_latency[self.day - 1] += process_time
-            self.reservation_status += self.kappa * frequency ** 3 * data_size * self.complexity / frequency
+            self.reservation_status += self.kappa * frequency ** 3 * \
+                data_size * self.complexity / frequency
             self.running_instance[action - 1] += 1
             # find the first sleeping core
             for i in range(len(self.core_frequency)):
@@ -167,7 +176,7 @@ class CompOffloadingEnv(gym.Env):
         #self.remain_task -= 1
         # print(self.remain_task)
         # if self.remain_task == 1:
-        
+
         if self.counter > self.simulation_end:
             is_terminal = True
         else:
@@ -232,7 +241,8 @@ class CompOffloadingEnv(gym.Env):
         data_size = state[-1]
         actions = set()
         for frequency_index, frequency in enumerate(self.frequency_set):
-            needed_reserve_energy = self.kappa * frequency ** 3 * data_size * self.complexity / frequency
+            needed_reserve_energy = self.kappa * frequency ** 3 * \
+                data_size * self.complexity / frequency
             if reservation_status + needed_reserve_energy > battery_status:
                 actions.add(frequency_index + 1)
             if np.sum(running_instance) == self.core_number:

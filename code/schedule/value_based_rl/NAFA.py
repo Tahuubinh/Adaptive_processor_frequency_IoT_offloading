@@ -7,6 +7,10 @@ import numpy as np
 import math
 from util.data_util import read_energy_data
 from schedule.value_based_rl.buffer.experience_replay import ExperienceReplay
+from schedule.DeepModel import DeepModel
+from util.options import args_parser
+
+args = args_parser()
 
 
 # network architecture
@@ -26,20 +30,19 @@ class DQN(nn.Module):
         return self.nn(x)
 
 
-class NAFA_Agent:
-    def __init__(self, options, env, num_series, max_episode, ep_long):
-        self.config = options
+class NAFA_Agent(DeepModel):
+    def __init__(self, *args, **kwargs):
+        super(NAFA_Agent, self).__init__(*args, **kwargs)
         self.is_training = True
         self.buffer = ExperienceReplay(self.config.max_buff)
-        self.action_dim = env.action_space.n
-        self.model = DQN(env.observation_space.shape[0], self.action_dim).to(self.config.device)
-        self.target_model = DQN(env.observation_space.shape[0], self.action_dim).to(self.config.device)
+        self.action_dim = self.env.action_space.n
+        self.model = DQN(self.env.observation_space.shape[0], self.action_dim).to(
+            self.config.device)
+        self.target_model = DQN(
+            self.env.observation_space.shape[0], self.action_dim).to(self.config.device)
         self.target_model.load_state_dict(self.model.state_dict())
-        self.model_optim = Adam(self.model.parameters(), lr=self.config.learning_rate)
-        self.env = env
-        self.max_episode = max_episode
-        self.ep_long = ep_long
-        self.num_series = num_series
+        self.model_optim = Adam(self.model.parameters(),
+                                lr=self.config.learning_rate)
 
         # non-Linear epsilon decay
         epsilon_final = self.config.epsilon_min
@@ -47,22 +50,11 @@ class NAFA_Agent:
         epsilon_decay = self.config.eps_decay
         self.epsilon_by_frame = lambda frame_idx: epsilon_final + (epsilon_start - epsilon_final) * math.exp(
             -1. * frame_idx / epsilon_decay)
-        
-    def find_max_action(self, s0, q_values):
-        actions = []
-        q_values = q_values.cpu().detach().numpy()
-        q_values = deepcopy(q_values)
-        for row in range(len(q_values)):
-            invalid = self.env.filterInvalidAction(s0[row])
-            for i in invalid:
-                q_values[row, i] = -float("inf")
-            action = np.argmax(q_values[row])
-            actions.append(action)
-        return actions
 
     # epsilon-greedy action
     def act(self, state, epsilon=None):
-        if epsilon is None: epsilon = 0
+        if epsilon is None:
+            epsilon = 0
         if random.random() > epsilon or not self.is_training:
             state_input = self.uniform_state(state.reshape(1, len(state)))
             q_value = self.model.forward(state_input)
@@ -75,11 +67,6 @@ class NAFA_Agent:
     # back-propagation
     def learning(self, fr):
         s0, a, r, s1, done = self.buffer.sample(self.config.batch_size)
-        # print(s0[0], a[0])
-        # print(len(s0), len(a))
-        # print(type(s0))
-        # print(type(s0[0]))
-        # assert 2 == 3
         r = torch.tensor(r, dtype=torch.float).to(self.config.device)
         s0_input = self.uniform_state(s0)
         s1_input = self.uniform_state(s1)
@@ -93,7 +80,8 @@ class NAFA_Agent:
 
         next_q_state_values = self.target_model(s1_input)
 
-        next_q_value = next_q_state_values.gather(1, max_q_action.unsqueeze(1)).squeeze(1)
+        next_q_value = next_q_state_values.gather(
+            1, max_q_action.unsqueeze(1)).squeeze(1)
         expected_q_value = r + self.config.discount * next_q_value
         # Notice that we need to detach the expected_q_value
         loss = (q_value - expected_q_value.detach()).pow(2).mean()
@@ -134,34 +122,16 @@ class NAFA_Agent:
                     losses.append(loss)
                 else:
                     losses.append(0)
-                
-                # print(self.config)
-                # print(self.config.print_interval)
-                # print(done)
-                # break
-                # if fr % self.config.print_interval == 0:
-                #     print("PERIOD: %d\nrewards: %f, losses: %f, episode: %d" % (
-                #         self.env.counter / 24, episode_reward / ((self.env.counter - self.env.simulation_start) / 24),
-                #         np.sum(losses[-100:]) / 100, ep_num))
-                #     print("epsilon = {}".format(epsilon))
+
                 state = next_state
                 if done:
                     print('Episode: {}\nrewards: {}  epsilon: {} losses: {}'.format(ep_num, episode_reward, epsilon,
-                                                                              np.sum(losses[-100:]) / 100))
-                    self.saveModel("../result", str(self.config.lambda_r) + "_" + str(self.config.tradeoff) + "_" + str(
+                                                                                    np.sum(losses[-100:]) / 100))
+                    self.saveModel(f'{args.link_project}/result', str(self.config.lambda_r) + "_" + str(self.config.tradeoff) + "_" + str(
                         self.config.trial))
                     episode_reward = 0
                     ep_num += 1
                     # self.env.event_queue.print_queue()
-
-            # self.save_data(all_rewards,counters,loss)
-
-    # debug usage . check the input state.
-    def check_input_state(self, input_s):
-        if np.max(input_s) > 1 or np.min(input_s) < 0:
-            return False
-        else:
-            return True
 
     # uniform the state to the scale of [0,1]
     def uniform_state(self, s):
@@ -177,23 +147,8 @@ class NAFA_Agent:
         input_s[:, 3:-1] = (input_s[:, 3:-1] - 0) / (self.env.core_number - 0)
         # data size
         input_s[:, -1] = (input_s[:, -1] - (self.env.avg_data_size - 10 * 8 * 1e6)) / (
-                (self.env.avg_data_size + 10 * 8 * 1e6) - (self.env.avg_data_size - 10 * 8 * 1e6))
+            (self.env.avg_data_size + 10 * 8 * 1e6) - (self.env.avg_data_size - 10 * 8 * 1e6))
         assert self.check_input_state(input_s)
-        input_s = torch.tensor(input_s, dtype=torch.float).to(self.config.device)
+        input_s = torch.tensor(
+            input_s, dtype=torch.float).to(self.config.device)
         return input_s
-
-    # load weight for the Q network
-    def loadWeights(self, model_path):
-        if model_path is None: return
-        self.model.load_state_dict(torch.load(model_path))
-
-    # def save_data(self,rewards,counters,loss):
-    #     output = open('data/tr_rewards_{}_{}.pkl'.format(str(self.config.lambda_r),str(self.config.tradeoff)) , 'wb')
-    #     pickle.dump(rewards,output)
-    #     output = open('data/tr_counters_{}_{}.pkl'.format(str(self.config.lambda_r), str(self.config.tradeoff)), 'wb')
-    #     pickle.dump(counters, output)
-    #     output = open('data/tr_loss_{}_{}.pkl'.format(str(self.config.lambda_r), str(self.config.tradeoff)), 'wb')
-    #     pickle.dump(loss,output)
-
-    def saveModel(self, output, tag=''):
-        torch.save(self.model.state_dict(), '%s/model_%s.pkl' % (output, tag))
