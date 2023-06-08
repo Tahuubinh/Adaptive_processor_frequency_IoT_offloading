@@ -28,7 +28,7 @@ class LinUCBAgent:
         input_s[2] = (input_s[2] - 0) / (self.env.battery_size - 0)
         input_s[3:-1] = (input_s[3:-1] - 0) / (self.env.core_number - 0)
         input_s[-1] = (input_s[-1] - (self.env.avg_data_size - 10 * 8 * 1e6)) / (
-                (self.env.avg_data_size + 10 * 8 * 1e6) - (self.env.avg_data_size - 10 * 8 * 1e6))
+            (self.env.avg_data_size + 10 * 8 * 1e6) - (self.env.avg_data_size - 10 * 8 * 1e6))
         input_s = np.resize(input_s, (self.d, 1))
         return input_s
 
@@ -40,13 +40,15 @@ class LinUCBAgent:
         estimated_reward = np.zeros(self.K)
         coefficient = [[] for i in range(self.K)]
         for arm in range(self.K):
-            coefficient[arm] = np.linalg.inv(self.matrix_H[arm]).dot(self.b[arm])
+            coefficient[arm] = np.linalg.inv(
+                self.matrix_H[arm]).dot(self.b[arm])
 
             empirical_reward[arm] = context.transpose().dot(coefficient[arm])
             exploration_reward[arm] = self.exploration_factor * math.sqrt(
                 context.transpose().dot(np.linalg.inv(self.matrix_H[arm])).dot(context))
             # print(exploration_reward[arm])
-            estimated_reward[arm] = empirical_reward[arm] + exploration_reward[arm]
+            estimated_reward[arm] = empirical_reward[arm] + \
+                exploration_reward[arm]
             # print(select_arm)
         # print("empirical:{}".format(empirical_reward))
         # print("exploration:{}".format(exploration_reward))
@@ -82,19 +84,23 @@ class LinUCBAgent:
                 episode_reward += reward
 
                 if done:
-                    print('episode:{} rewards:{} '.format(ep_num, episode_reward))
+                    print('episode:{} rewards:{} '.format(
+                        ep_num, episode_reward))
                     self.save_model()
                     episode_reward = 0
                     ep_num += 1
 
     def save_model(self):
         data = [self.matrix_H, self.b]
-        output = open('data/linucb_{}_{}.pkl'.format(str(self.config.lambda_r), str(self.config.tradeoff)), 'wb')
+        output = open('data/linucb_{}_{}.pkl'.format(str(self.config.lambda_r),
+                      str(self.config.tradeoff)), 'wb')
         pickle.dump(data, output)
 
     def load_model(self):
-        output = open('data/linucb_{}_{}.pkl'.format(str(self.config.lambda_r), str(self.config.tradeoff)), 'rb')
-        print('data/linucb_{}_{}.pkl'.format(str(self.config.lambda_r), str(self.config.tradeoff)))
+        output = open('data/linucb_{}_{}.pkl'.format(str(self.config.lambda_r),
+                      str(self.config.tradeoff)), 'rb')
+        print('data/linucb_{}_{}.pkl'.format(str(self.config.lambda_r),
+              str(self.config.tradeoff)))
         data = pickle.load(output)
         self.matrix_H = data[0]
         self.b = data[1]
@@ -102,13 +108,15 @@ class LinUCBAgent:
     def do_update(self, arm, state, reward):
         # transfer the selection client into context
         context = self.uniform_state(state)
-        self.matrix_H[arm] = self.matrix_H[arm] + context.dot(context.transpose())
+        self.matrix_H[arm] = self.matrix_H[arm] + \
+            context.dot(context.transpose())
         self.b[arm] = self.b[arm] + context * (reward)
 
     # function for testing purpose
     def gen_fake_reward(self, state, action):
         context = self.uniform_state(state)
-        theta = np.resize(np.array([-0.9, -0.8, -0.7, -0.6, -0.5, -0.4]) - action, (self.d, 1))
+        theta = np.resize(
+            np.array([-0.9, -0.8, -0.7, -0.6, -0.5, -0.4]) - action, (self.d, 1))
         # print(theta)
         reward = context.transpose().dot(theta)[0]
         return reward

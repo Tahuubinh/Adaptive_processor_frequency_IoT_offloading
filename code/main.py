@@ -10,7 +10,8 @@ from util.model_util import trainModel
 if __name__ == "__main__":
     args = args_parser()
     args.device = torch.device("cpu")
-    args.method = 'NAFA'
+    args.method = 'BR'
+    args.tradeoff = 6
     args.save_folder = args.method
 
     path = f'{args.link_project}/result/{args.save_folder}'
@@ -23,22 +24,25 @@ if __name__ == "__main__":
     N_S = env.observation_space.shape[0]
     N_A = env.action_space.n
     immediate_reward = 0
-    agent = trainModel(args, env)
+    agent = trainModel(args, env, num_series=2, max_episode=2, eplong=24)
     episode = 0
     GHI_Data = read_energy_data(is_train=False)
     done = True
     accept = 0
     count_act = 0
+    agent.test()
+
     # while episode < 1:
     #     if done:
-    #         s = env.reset(is_train=False, simulation_start=0, simulation_end=24, GHI_Data=GHI_Data)
+    #         s = env.reset(is_train=False, simulation_start=0,
+    #                       simulation_end=300 * 24, GHI_Data=GHI_Data)
     #     action = agent.act(s)
     #     if action != 0:
     #         accept += 1
-    #     count_act += 1
     #     s, r, done = env.step(action)
     #     if done:
-    #         print("average accept ratio of {}%".format(accept / count_act * 100))
-    #         print("average reward of {}".format(np.mean(env.day_rewards)))
+    #         print("average accept ratio of {}".format(accept))
+    #         print("average reward{}".format(np.mean(env.day_rewards)))
     #         episode += 1
-    save_data(env, args)
+
+    # save_data(env, args)

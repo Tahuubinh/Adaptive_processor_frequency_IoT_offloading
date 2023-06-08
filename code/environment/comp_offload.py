@@ -39,12 +39,15 @@ class CompOffloadingEnv(gym.Env):
         self.panel_size = args.panel_size
         self.args = args
         self.episodeID = 0
-        with open(f"{self.args.link_project}/result/{self.args.save_folder}/overall.csv", 'w', newline='') as file:
+        self.overall_results = None
+        self.overall_name = f"{self.args.link_project}/result/{self.args.save_folder}/overall.csv"
+        self.action_choices_name = f"{self.args.link_project}/result/{self.args.save_folder}/action_choices.csv"
+        with open(self.overall_name, 'w', newline='') as file:
             csvwriter = csv.writer(file)
             csvwriter.writerow(['episode', 'total_request', 'average_latency', 'average_reject_conservation', 'average_reject_low_power',
                                 'average_reject_overload', 'average_rewards'])
 
-        with open(f"{self.args.link_project}/result/{self.args.save_folder}/action_choices.csv", 'w', newline='') as file:
+        with open(self.action_choices_name, 'w', newline='') as file:
             csvwriter = csv.writer(file)
             csvwriter.writerow([*range(self.action_space.n)])
 
@@ -184,24 +187,22 @@ class CompOffloadingEnv(gym.Env):
         assert self.event.name == 0
         return self.convertCurrentStatusToState(), reward, is_terminal
 
+    def calculateRewardOnAction(self, action):
+        frequency = self.frequency_set[action - 1]
+        data_size = self.event.extra_msg
+        process_time = data_size * self.complexity / (frequency * 3600)
+        # print(process_time)
+        reward = 1 - (self.args.tradeoff * process_time)
+        return reward
+
     # reset the current environment status
     def reset(self, is_train, simulation_start, simulation_end, GHI_Data):
-        if not is_train:
-            np.random.seed(0)
+
         self.simulation_start = simulation_start
         self.simulation_end = simulation_end
         # initialize counter
         self.counter = simulation_start
-        # initialize produce_rate=0
-        self.energy_produce_rate = 0
-        # initialize core frequency
-        self.core_frequency = np.zeros(self.core_number)
-        # initialize energy reservation queue
-        self.reservation_status = 0
-        # initialize battery_status
-        self.battery_status = 0
-        # initialize frequency type
-        self.running_instance = np.zeros(len(self.frequency_set))
+        # self.replay(is_train, simulation_start, simulation_end, GHI_Data)
 
         ###########################
         # statistic data for recording purpose
@@ -224,6 +225,32 @@ class CompOffloadingEnv(gym.Env):
         self.updatePostActionStatus()
         return self.convertCurrentStatusToState()
 
+    def replay(self, is_train, simulation_start, simulation_end, GHI_Data):
+        if not is_train:
+            # np.random.seed(0)
+            self.overall_name = f"{self.args.link_project}/result/{self.args.save_folder}/overall_test.csv"
+            self.action_choices_name = f"{self.args.link_project}/result/{self.args.save_folder}/action_choices_test.csv"
+            with open(self.overall_name, 'w', newline='') as file:
+                csvwriter = csv.writer(file)
+                csvwriter.writerow(['episode', 'total_request', 'average_latency', 'average_reject_conservation', 'average_reject_low_power',
+                                    'average_reject_overload', 'average_rewards'])
+
+            with open(self.action_choices_name, 'w', newline='') as file:
+                csvwriter = csv.writer(file)
+                csvwriter.writerow([*range(self.action_space.n)])
+        # initialize counter
+        self.counter = simulation_start
+        # initialize produce_rate=0
+        self.energy_produce_rate = 0
+        # initialize core frequency
+        self.core_frequency = np.zeros(self.core_number)
+        # initialize energy reservation queue
+        self.reservation_status = 0
+        # initialize battery_status
+        self.battery_status = 0
+        # initialize frequency type
+        self.running_instance = np.zeros(len(self.frequency_set))
+
     def saveResults(self):
         n_total_request = np.sum(self.n_total_request)
         average_latency = np.sum(self.total_latency) / n_total_request
@@ -234,11 +261,12 @@ class CompOffloadingEnv(gym.Env):
         average_reject_overload = np.sum(
             self.n_reject_overload) / n_total_request
         average_rewards = np.sum(self.day_rewards) / n_total_request
-        with open(f"{self.args.link_project}/result/{self.args.save_folder}/overall.csv", 'a', newline='') as file:
+        self.overall_results = [self.episodeID, n_total_request, average_latency, average_reject_conservation, average_reject_low_power,
+                                average_reject_overload, average_rewards]
+        with open(self.overall_name, 'a', newline='') as file:
             csvwriter = csv.writer(file)
-            csvwriter.writerow([self.episodeID, n_total_request, average_latency, average_reject_conservation, average_reject_low_power,
-                                average_reject_overload, average_rewards])
-        with open(f"{self.args.link_project}/result/{self.args.save_folder}/action_choices.csv", 'a', newline='') as file:
+            csvwriter.writerow(self.overall_results)
+        with open(self.action_choices_name, 'a', newline='') as file:
             csvwriter = csv.writer(file)
             csvwriter.writerow(self.action_choices)
         self.episodeID += 1

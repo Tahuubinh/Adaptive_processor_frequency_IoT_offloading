@@ -3,7 +3,7 @@ from util.data_util import read_energy_data
 # best fit algorithm, which consistently choose the least frequency if applicable.
 
 
-class bestFit():
+class bestReward():
     def __init__(self, env, max_episode, ep_long):
         self.env = env
         self.last_deploy_core = 0
@@ -17,14 +17,17 @@ class bestFit():
 
     def act(self, s):
         possible_actions = self.env.getPossibleActionGivenState(s)
-        accept = False
-        for frequency_index in range(len(self.env.frequency_set)):
-            action = frequency_index + 1
-            if action in possible_actions:
-                accept = True
-                break
-        if not accept:
-            action = 0
+        action = 0
+        max_value = -100
+        for test_action in possible_actions:
+            if test_action == 0:
+                continue
+            test_value = self.env.calculateRewardOnAction(test_action)
+            # print(test_value)
+            if max_value < test_value:
+                max_value = test_value
+                action = test_action
+
         return action
 
     def test(self):
